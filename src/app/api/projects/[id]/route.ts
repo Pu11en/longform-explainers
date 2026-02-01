@@ -8,6 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const supabase = getSupabase();
 
     // Fetch project
     const { data: project, error: projectError } = await supabase

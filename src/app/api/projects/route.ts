@@ -4,6 +4,7 @@ import { getSupabase } from '@/lib/supabase';
 // GET /api/projects - List all projects
 export async function GET() {
   try {
+    const supabase = getSupabase();
     const { data: projects, error } = await supabase
       .from('projects')
       .select('*')
@@ -26,6 +27,7 @@ export async function GET() {
 // POST /api/projects - Create a new project and start processing
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const { topic } = await request.json();
 
     if (!topic || typeof topic !== 'string') {
@@ -61,6 +63,8 @@ export async function POST(request: NextRequest) {
 
 // Async processing function
 async function processProject(projectId: string) {
+  const supabase = getSupabase();
+  
   try {
     // Update status to scripting
     await supabase
