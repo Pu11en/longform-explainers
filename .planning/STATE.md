@@ -1,21 +1,25 @@
 # Current State
 
-## Status: 🟡 In Progress
+## Status: 🟢 MVP Deployed
 
 ## What's Done
 - [x] GSD planning setup
+- [x] Next.js project with Tailwind
+- [x] Submission form UI
+- [x] Project list with status
+- [x] Project detail page with progress
+- [x] API routes for projects
+- [x] Script generation (mock + OpenRouter ready)
+- [x] Deployed to Vercel: https://longform-explainers.vercel.app
 
 ## What's Next
-- [ ] Initialize Next.js project
-- [ ] Set up Supabase schema
-- [ ] Create submission form
-- [ ] Implement script generation
-- [ ] Implement TTS
-- [ ] Implement video generation
-- [ ] Deploy to Vercel
+- [x] Create Supabase tables (need to run SQL in dashboard)
+- [ ] Add Fish Audio TTS integration
+- [ ] Add WaveSpeed video integration
+- [ ] Real-time updates
 
 ## Blockers
-- None
+- Database tables need to be created in Supabase dashboard
 
 ## Recent Changes
-- Initial setup started
+- Deployed working MVP to Vercel

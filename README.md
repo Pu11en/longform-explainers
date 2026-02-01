@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎬 Longform AI Explainers
 
-## Getting Started
+Generate professional explainer videos from any topic using AI.
 
-First, run the development server:
+**Live App**: https://longform-explainers.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- 📝 Submit any topic to generate an explainer video script
+- ✍️ AI-powered script generation (OpenRouter/Gemini)
+- 🎙️ Text-to-speech voice narration (Fish Audio)
+- 🎬 Talking-head video generation (WaveSpeed AI)
+- 🎞️ B-roll image prompts for visual enhancement
+- 📊 Real-time progress tracking
+
+## Tech Stack
+
+- **Frontend**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS
+- **Database**: Supabase (PostgreSQL)
+- **Hosting**: Vercel
+- **AI APIs**: OpenRouter, Fish Audio, WaveSpeed AI
+
+## Setup
+
+### 1. Create Supabase Tables
+
+Run this SQL in your Supabase SQL Editor:
+
+```sql
+-- Projects table (main video requests)
+CREATE TABLE IF NOT EXISTS projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'created',
+  script_full TEXT,
+  broll_prompts JSONB,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Segments table (individual video segments)
+CREATE TABLE IF NOT EXISTS segments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  segment_number INTEGER NOT NULL,
+  script_text TEXT,
+  voice_url TEXT,
+  video_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_segments_project_id ON segments(project_id);
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Set these in your Vercel project (or `.env.local` for local dev):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+OPENROUTER_API_KEY=your_openrouter_key (optional, uses mock data without)
+FISH_AUDIO_API_KEY=your_fish_audio_key (optional)
+WAVESPEED_API_KEY=your_wavespeed_key (optional)
+```
 
-## Learn More
+### 3. Run Locally
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Pipeline Status Flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Created** - Project submitted
+2. **Scripting** - AI generating script
+3. **Voice** - TTS creating narration
+4. **Video** - Generating talking-head segments
+5. **B-Roll** - Creating B-roll prompts
+6. **Done** - All segments complete
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
