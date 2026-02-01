@@ -30,6 +30,7 @@ export interface GeneratedScript {
     estimate_mins: number;
     word_count: number;
     broll_prompts: {
+      onscreen_text?: string;
       start_image_prompt: string;
       video_prompt: string;
     }[];
@@ -68,6 +69,7 @@ export async function generateScript(
         estimate_mins: segment.duration_minutes,
         word_count: segment.word_count,
         broll_prompts: brollData.segments.map(s => ({
+          onscreen_text: s.onscreen_text,
           start_image_prompt: s.start_image_prompt,
           video_prompt: s.video_prompt,
         })),
@@ -216,8 +218,16 @@ function buildScriptUserPrompt(
 
 /**
  * Mock script for testing without API key
+ * Uses proper SEALCaM format with newline-separated keys and required ending
  */
 function getMockScript(topic: string): GeneratedScript {
+  // Define consistent color palette for all segments
+  const colorPalette = {
+    primary: 'deep cyan (#0891B2)',
+    secondary: 'rich purple (#7C3AED)',
+    accent: 'warm gold (#F59E0B)',
+  };
+
   return {
     total_minutes: 2,
     speech_prompt: DEFAULT_SPEECH_PROMPT,
@@ -230,8 +240,15 @@ function getMockScript(topic: string): GeneratedScript {
         word_count: 45,
         broll_prompts: [
           {
-            start_image_prompt: `Subject: Abstract visualization of ${topic} concept, glowing interconnected nodes forming a network pattern. Environment: Dark void with deep blue-purple gradient, subtle particle field creating depth. Action: Static starting frame, dormant energy state. Lighting: Soft cyan key light from above-left, purple rim highlights on node edges, high contrast ratio 4:1. Camera: RED Komodo 6K, 24mm Sigma Art prime lens, centered wide shot, locked-off tripod position. Metatokens: Photorealistic CGI, clean digital aesthetic, 4K resolution, cinematic color grade, subtle lens vignette.`,
-            video_prompt: `Subject: Network nodes activating in sequence, connection lines illuminating with flowing energy pulses. Environment: Same dark void, particles beginning gentle drift toward camera. Action: Nodes pulse and glow brighter, energy ripples expand outward, slow 2-second dolly push-in. Lighting: Key light intensity increases 20%, additional fill emerges from activated nodes. Camera: RED Komodo 6K, 24mm Sigma Art, slow dolly push from wide to medium-wide, 2 seconds duration. Metatokens: Smooth 24fps motion, photorealistic CGI, subtle lens bloom on bright highlights, cinematic motion blur.`
+            onscreen_text: "Everything clicks",
+            start_image_prompt: `Subject: Abstract visualization of ${topic} concept, glowing interconnected nodes forming a network pattern, on-screen text "Everything clicks" integrated naturally.
+Environment: Dark void with deep cyan (${colorPalette.primary}) and rich purple (${colorPalette.secondary}) gradient, subtle particle field creating depth.
+Action: Static starting frame, dormant energy state, no movement.
+Lighting: Soft cyan key light from above-left, purple rim highlights on node edges, high contrast ratio 4:1, color temperature 6500K.
+Camera: RED Komodo 6K, 24mm Sigma Art prime lens, centered wide shot, eye level angle, locked-off no movement.
+Metatokens: photorealistic CGI, clean digital aesthetic, 4K resolution, cinematic color grade, subtle lens vignette, tech-modern style
+ignore the colors of the reference image`,
+            video_prompt: `Subject: Network nodes activating in sequence, connection lines illuminating with flowing cyan energy pulses. Environment: Same dark void with ${colorPalette.primary} and ${colorPalette.secondary} gradient, particles beginning gentle drift toward camera. Action: Nodes pulse and glow brighter, energy ripples expand outward, slow 2-second dolly push-in. Lighting: Key light intensity increases 20%, additional fill emerges from activated nodes, maintains color temperature. Camera: RED Komodo 6K, 24mm Sigma Art, slow dolly push from wide to medium-wide over 2 seconds. Metatokens: smooth 24fps motion, photorealistic CGI, subtle lens bloom on highlights, cinematic motion blur.`
           }
         ]
       },
@@ -243,8 +260,15 @@ function getMockScript(topic: string): GeneratedScript {
         word_count: 50,
         broll_prompts: [
           {
-            start_image_prompt: `Subject: Clean infographic with three key icons arranged in triangular composition, modern flat design with subtle 3D depth. Environment: Pure white studio backdrop, soft drop shadows grounding elements. Action: Static frame, all elements in final position. Lighting: Large soft diffused key from front-above, minimal shadows, even 18% gray exposure. Camera: Sony FX6, 50mm Sony G Master prime, straight-on medium shot at eye level, locked tripod. Metatokens: Motion graphics aesthetic, vector-clean edges, broadcast quality finish, subtle film grain 5%.`,
-            video_prompt: `Subject: Icons animate in sequence with smooth ease-out, connecting lines draw between them with energy pulse. Environment: White backdrop maintains clean consistency throughout. Action: Elements scale from 80% to 100% with bounce easing, lines draw left-to-right at 0.5s intervals. Lighting: Consistent soft lighting, no changes. Camera: Sony FX6, 50mm G Master, static locked-off shot throughout. Metatokens: 30fps smooth motion graphics, clean vector animation style, professional broadcast aesthetic, subtle ambient occlusion.`
+            onscreen_text: "Three key principles",
+            start_image_prompt: `Subject: Clean infographic with three key icons arranged in triangular composition, modern flat design with subtle 3D depth, on-screen text "Three key principles" centered below.
+Environment: Pure white studio backdrop with soft drop shadows, maintaining ${colorPalette.primary} and ${colorPalette.accent} accent colors on icons.
+Action: Static frame, all elements in final position, no movement.
+Lighting: Large soft diffused key from front-above, minimal shadows, even 18% gray exposure, neutral 5600K temperature.
+Camera: Sony FX6, 50mm Sony G Master prime, straight-on medium shot at eye level, locked-off no movement.
+Metatokens: motion graphics aesthetic, vector-clean edges, broadcast quality finish, subtle film grain 5%, professional corporate style
+ignore the colors of the reference image`,
+            video_prompt: `Subject: Icons animate in sequence with smooth ease-out, connecting lines draw between them with ${colorPalette.accent} energy pulse. Environment: White backdrop maintains clean consistency, ${colorPalette.primary} accents on active elements. Action: Elements scale from 80% to 100% with bounce easing, lines draw left-to-right at 0.5s intervals, icons rotate subtly. Lighting: Consistent soft lighting throughout, no changes. Camera: Sony FX6, 50mm G Master, static locked-off shot throughout. Metatokens: 30fps smooth motion graphics, clean vector animation style, professional broadcast aesthetic.`
           }
         ]
       },
@@ -256,8 +280,15 @@ function getMockScript(topic: string): GeneratedScript {
         word_count: 50,
         broll_prompts: [
           {
-            start_image_prompt: `Subject: Hands positioned on laptop keyboard, screen displaying progress dashboard with metrics, coffee cup as secondary element. Environment: Contemporary home office, warm morning light, organized desk with plant, large window with soft city bokeh background. Action: Typing paused, hands resting naturally on keyboard. Lighting: Warm morning sunlight as key from window-right at 45 degrees, soft bounce fill from white desk surface, golden hour color temperature 3200K. Camera: Canon R5, 35mm RF prime lens f/2.0, over-the-shoulder composition, slight high angle, shallow depth of field. Metatokens: Lifestyle realism, warm inviting color palette, subtle film emulation, relatable aspirational aesthetic.`,
-            video_prompt: `Subject: Hands resume purposeful typing, screen metrics animate upward, success notification slides in from top. Environment: Steam rises gently from coffee cup, plant leaves shift slightly. Action: Confident typing rhythm 3 seconds, dashboard numbers climb with easing, subtle celebration micro-gesture. Lighting: Consistent warm sunlight, screen glow increasing on face by 10%. Camera: Canon R5, 35mm RF prime, slow push-in from OTS to CU of screen over 4 seconds, subtle handheld organic movement. Metatokens: 24fps cinematic, lifestyle commercial aesthetic, motivated positive energy, warm grade with lifted shadows.`
+            onscreen_text: "Start with basics",
+            start_image_prompt: `Subject: Hands positioned on laptop keyboard, screen displaying progress dashboard with upward metrics, coffee cup as secondary element, subtle on-screen text "Start with basics".
+Environment: Contemporary home office with warm morning light, organized desk with plant, large window with soft city bokeh, ${colorPalette.accent} accent in decor elements.
+Action: Typing paused, hands resting naturally on keyboard, steam from coffee frozen mid-rise, no movement.
+Lighting: Warm morning sunlight as key from window-right at 45 degrees, soft bounce fill from white desk, golden hour 3200K temperature.
+Camera: Canon R5, 35mm RF prime lens f/2.0, over-the-shoulder composition, slight high angle, shallow depth of field, locked-off no movement.
+Metatokens: lifestyle realism, warm inviting color palette, subtle film emulation, relatable aspirational aesthetic, natural skin tones
+ignore the colors of the reference image`,
+            video_prompt: `Subject: Hands resume purposeful typing, screen metrics animate upward with ${colorPalette.primary} accent, success notification with ${colorPalette.accent} slides in. Environment: Steam rises gently from coffee cup, plant leaves shift slightly in breeze. Action: Confident typing rhythm over 3 seconds, dashboard numbers climb with easing, subtle satisfied micro-expression. Lighting: Consistent warm sunlight, screen glow increasing slightly. Camera: Canon R5, 35mm RF prime, slow push-in from OTS to CU of screen over 4 seconds, subtle handheld organic movement. Metatokens: 24fps cinematic, lifestyle commercial aesthetic, motivated positive energy, warm grade.`
           }
         ]
       },
@@ -269,8 +300,15 @@ function getMockScript(topic: string): GeneratedScript {
         word_count: 35,
         broll_prompts: [
           {
-            start_image_prompt: `Subject: Person silhouette at mountain summit, arms at sides, overlooking vast landscape with sea of clouds below. Environment: Epic mountain vista at golden hour, layered mountain ridges receding into atmospheric haze, dramatic sky gradient. Action: Static hero moment, figure contemplating achievement. Lighting: Dramatic golden hour backlight creating strong silhouette, sun positioned just above horizon as rim light, warm atmospheric haze diffusing light. Camera: RED V-Raptor 8K, 24mm Cooke S7 anamorphic, wide establishing shot, locked-off heavy tripod. Metatokens: Epic cinematic realism, nature documentary quality, rich dynamic range, inspirational aspirational tone, 2.39:1 aspect ratio.`,
-            video_prompt: `Subject: Figure slowly raises arms in achievement pose, sun crests horizon creating natural lens flare. Environment: Clouds drift slowly below, golden light intensifies and spreads across landscape. Action: Triumphant arm raise over 3 seconds, subtle wind movement in clothing and hair, sun rising creates dynamic real-time light change. Lighting: Sun breaks fully over horizon, backlight intensifies 40%, golden rays spread across frame. Camera: RED V-Raptor 8K, 24mm Cooke S7 anamorphic, slow tilt-up following arm movement, locked tripod. Metatokens: Smooth 24fps, epic scale and grandeur, anamorphic lens flare artifacts, peak cinematic inspirational moment.`
+            onscreen_text: "You've got this",
+            start_image_prompt: `Subject: Person silhouette at mountain summit, arms at sides, overlooking vast landscape with sea of clouds below, on-screen text "You've got this" in lower third.
+Environment: Epic mountain vista at golden hour, layered ridges receding into atmospheric haze, sky gradient from ${colorPalette.accent} to ${colorPalette.secondary}.
+Action: Static hero moment, figure contemplating achievement, clouds frozen in position, no movement.
+Lighting: Dramatic golden hour backlight creating strong silhouette, sun positioned just above horizon as rim light, warm atmospheric haze, 2800K temperature.
+Camera: RED V-Raptor 8K, 24mm Cooke S7 anamorphic, wide establishing shot, eye level angle, locked-off heavy tripod, no movement.
+Metatokens: epic cinematic realism, nature documentary quality, rich dynamic range, inspirational aspirational tone, 2.39:1 aspect ratio, film grain 10%
+ignore the colors of the reference image`,
+            video_prompt: `Subject: Figure slowly raises arms in achievement pose over 3 seconds, sun crests horizon creating natural ${colorPalette.accent} lens flare. Environment: Clouds drift slowly below at 5% speed, golden light with ${colorPalette.accent} hue intensifies across landscape. Action: Triumphant arm raise, subtle wind movement in clothing and hair, sun rising creates dynamic light change. Lighting: Sun breaks fully over horizon, backlight intensifies 40%, golden rays spread across frame. Camera: RED V-Raptor 8K, 24mm Cooke S7 anamorphic, slow tilt-up following arm movement over 4 seconds, locked tripod. Metatokens: smooth 24fps, epic scale and grandeur, anamorphic lens flare artifacts, peak cinematic inspirational moment.`
           }
         ]
       }
@@ -289,12 +327,24 @@ function getMockBroll(script: string): BrollGeneratorOutput {
   return {
     total_segments: numSegments,
     estimated_duration_seconds: durationSeconds,
+    color_palette: {
+      primary: 'deep cyan (#0891B2)',
+      secondary: 'rich purple (#7C3AED)',
+      accent: 'warm gold (#F59E0B)',
+    },
     segments: [{
       segment_number: 1,
       script_excerpt: script.slice(0, 100) + '...',
       duration_seconds: durationSeconds,
-      start_image_prompt: `Subject: Abstract conceptual visualization related to the topic. Environment: Clean modern backdrop with subtle depth. Action: Static starting frame. Lighting: Soft diffused key light, balanced fill. Camera: Sony FX6, 35mm prime, medium shot, locked-off. Metatokens: Professional broadcast quality, clean aesthetic.`,
-      video_prompt: `Subject: Elements animate with purpose and intention. Environment: Backdrop maintains consistency. Action: Smooth motion with clear direction and purpose. Lighting: Consistent throughout. Camera: Sony FX6, 35mm prime, subtle push-in. Metatokens: Smooth 24fps, professional motion graphics quality.`
+      onscreen_text: 'Key insight',
+      start_image_prompt: `Subject: Abstract conceptual visualization related to the topic, on-screen text "Key insight" integrated naturally.
+Environment: Clean modern backdrop with subtle depth, deep cyan and purple gradient.
+Action: Static starting frame, no movement.
+Lighting: Soft diffused key light from front-above, balanced fill, 5600K color temperature.
+Camera: Sony FX6, 35mm prime lens, medium shot, eye level, locked-off no movement.
+Metatokens: professional broadcast quality, clean aesthetic, modern corporate style, 4K resolution
+ignore the colors of the reference image`,
+      video_prompt: `Subject: Elements animate with purpose and intention, subtle glow effects activate. Environment: Backdrop maintains consistency, particles drift gently. Action: Smooth motion with clear direction over 3 seconds. Lighting: Consistent throughout with subtle intensity shifts. Camera: Sony FX6, 35mm prime, subtle push-in over 2 seconds. Metatokens: smooth 24fps, professional motion graphics quality, clean transitions.`
     }]
   };
 }

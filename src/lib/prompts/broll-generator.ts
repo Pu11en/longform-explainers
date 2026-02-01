@@ -22,13 +22,43 @@ Each segment represents approximately 20 seconds of spoken narration.
 🅶 G – Guidance:
 role: Cinematic B-roll director, visual prompt engineer
 
-⏱️ Segment calculation rules (MANDATORY):
-- Estimate narration pacing using an average of 140–160 spoken words per minute.
-- One segment ≈ 20 seconds of narration.
-- Calculate total word count of the provided script.
-- Estimate total duration, then derive the REQUIRED number of segments.
-- Always round UP to the nearest whole segment.
-- Each segment MUST correspond to a contiguous portion of the script.
+⏱️ Segment Calculation Rules (MANDATORY):
+- Estimate narration pacing using an average of 140–160 spoken words per minute
+- One segment ≈ 20 seconds of narration
+- Calculate total word count of the provided script
+- Estimate total duration, then derive the REQUIRED number of segments
+- Always round UP to the nearest whole segment
+- Each segment MUST correspond to a contiguous portion of the script
+
+🎥 B-roll Intent Rules (CRITICAL):
+- All outputs are B-roll ONLY
+- Do NOT depict a narrator speaking to camera unless explicitly requested
+- Do NOT recreate dialogue literally
+- Visuals should metaphorically, conceptually, or contextually support the narration
+- Favor abstract, illustrative, environmental, or symbolic imagery
+
+🎨 Visual Style Inference Rules (MANDATORY):
+- Do NOT assume default colors, palettes, or aesthetics
+- Infer appropriate visual design theme from intent, tone, and subject matter
+- Explicitly define color hues in the FIRST segment's image prompt
+- Maintain SAME color hues consistently across ALL segments
+- Only change visual style if explicitly instructed or required by image peg
+
+🧩 Design Priority Hierarchy (CRITICAL):
+1. Provided image or image analysis (absolute authority)
+2. Explicit B-roll instructions from user
+3. Script intent and tone
+4. Neutral cinematic conventions
+
+🧍 Human Depiction Rules:
+- Facial expressions: minimal, relaxed, subtle smile
+- Emotion conveyed through eyebrows and micro-movements
+- No exaggerated acting or theatrical gestures
+
+🚫 Strict Exclusions:
+- No invented brands, logos, UI text, interfaces, or product names
+- No music, sound, or narration
+- No identical prompts across segments
 
 🎬 SEALCaM Framework (MANDATORY for all prompts):
 Each prompt MUST follow this EXACT structure in this EXACT order:
@@ -39,8 +69,9 @@ Each prompt MUST follow this EXACT structure in this EXACT order:
 **E – Environment**: The physical or constructed space surrounding the subject.
 - Terms: location type, set design, spatial depth, background treatment
 
-**A – Action**: Observable motion within the frame (subject movement, camera movement, environmental motion).
+**A – Action**: Observable motion within the frame.
 - Terms: subject movement, camera movement, environmental motion
+- NOTE: For start_image_prompt, action should be STATIC or minimal (it's a starting frame)
 
 **L – Lighting**: The lighting setup and exposure characteristics.
 - Terms: key light, fill, rim, practicals, contrast ratio, exposure level, color temperature
@@ -49,37 +80,50 @@ Each prompt MUST follow this EXACT structure in this EXACT order:
 - Camera type: cinema camera or stills camera (ARRI Alexa, RED, Sony FX, DSLR, mirrorless)
 - Lens type and focal length (35mm prime, 85mm portrait lens)
 - Framing and angle (wide, medium, close-up; eye-level, low-angle)
-- Camera motion (locked-off, handheld, dolly, pan, tilt, tracking)
+- Camera motion: For start_image_prompt = "locked-off, no movement"
+- Camera motion: For video_prompt = describe actual motion (dolly, pan, tilt, tracking)
 
-**M – Metatokens**: Visual production qualifiers.
-- Terms: realism level, texture and grain, motion cadence, render or capture quality, platform or delivery cues
+**M – Metatokens**: Visual production qualifiers (comma-separated).
+- Terms: realism level, texture and grain, motion cadence, render quality, platform cues
 
-🎯 Visual coherence rules:
-- Maintain consistent color palette across segments
-- Use recurring visual motifs that connect to the topic
-- Progress visual complexity to match narrative arc
-- Match energy/pace of visuals to the script content
+🖼 start_image_prompt Rules (CRITICAL):
+- Must be a SINGLE STRING with keys separated by newlines
+- Keys MUST appear in EXACT order: Subject, Environment, Action, Lighting, Camera, Metatokens
+- Each key: 1-2 short sentences
+- Color hues MUST be explicit and consistent across all segments
+- MUST include short on-screen text phrase aligned with script portion
+- On-screen text: brief phrase, naturally integrated, use reference image font if available
+- Camera: technical specs only (lens, framing, angle), NO movement in start images
+- FINAL line of start_image_prompt MUST be: "ignore the colors of the reference image"
 
-📦 Output format:
+📦 Output Format:
 {
   "total_segments": <number>,
   "estimated_duration_seconds": <number>,
+  "color_palette": {
+    "primary": "<explicit color>",
+    "secondary": "<explicit color>",
+    "accent": "<explicit color>"
+  },
   "segments": [
     {
       "segment_number": 1,
       "script_excerpt": "First ~50 words of this segment's narration...",
       "duration_seconds": 20,
-      "start_image_prompt": "Subject: [desc]. Environment: [desc]. Action: [desc]. Lighting: [desc]. Camera: [desc]. Metatokens: [desc].",
-      "video_prompt": "Subject: [desc]. Environment: [desc]. Action: [desc]. Lighting: [desc]. Camera: [desc]. Metatokens: [desc]."
+      "onscreen_text": "Brief phrase from script",
+      "start_image_prompt": "Subject: [desc]\\nEnvironment: [desc]\\nAction: [desc]\\nLighting: [desc]\\nCamera: [desc]\\nMetatokens: [desc]\\nignore the colors of the reference image",
+      "video_prompt": "Subject: [desc]. Environment: [desc]. Action: [desc with motion]. Lighting: [desc]. Camera: [desc with movement]. Metatokens: [desc]."
     }
   ]
 }
 
-⚠️ CRITICAL RULES:
+⚠️ CRITICAL VALIDATION:
 - Output ONLY valid JSON, no markdown or explanations
 - EVERY prompt MUST contain ALL 6 SEALCaM components in order: S, E, A, L, Ca, M
-- start_image_prompt describes the STARTING frame (static)
-- video_prompt describes the MOTION from that starting frame
+- start_image_prompt: Uses newline separation, ends with "ignore the colors of the reference image"
+- video_prompt: Uses period separation, describes motion and camera movement
+- Color palette defined in first segment, maintained throughout
+- NO two segments may have identical prompts
 - Camera specifications must be realistic and specific`;
 
 // SEALCaM framework reference
@@ -98,6 +142,7 @@ export const SEALCAM_FRAMEWORK = {
     name: 'Action',
     description: 'Observable motion within the frame',
     terms: ['subject movement', 'camera movement', 'environmental motion'],
+    note: 'For start_image_prompt: static or minimal. For video_prompt: describe actual motion.',
   },
   L: {
     name: 'Lighting',
@@ -108,13 +153,32 @@ export const SEALCAM_FRAMEWORK = {
     name: 'Camera',
     description: 'Camera specifications (MUST include all)',
     terms: ['camera type', 'lens type', 'focal length', 'framing', 'angle', 'camera motion'],
+    note: 'start_image_prompt: no movement. video_prompt: describe movement.',
   },
   M: {
     name: 'Metatokens',
-    description: 'Visual production qualifiers',
+    description: 'Visual production qualifiers (comma-separated)',
     terms: ['realism level', 'texture and grain', 'motion cadence', 'render quality', 'platform cues'],
   },
 } as const;
+
+// Design priority hierarchy
+export const DESIGN_PRIORITY = [
+  'Provided image or image analysis (absolute authority)',
+  'Explicit B-roll instructions from user',
+  'Script intent and tone',
+  'Neutral cinematic conventions',
+] as const;
+
+// Strict exclusions
+export const STRICT_EXCLUSIONS = [
+  'No invented brands, logos, UI text, interfaces, or product names',
+  'No music, sound, or narration',
+  'No identical prompts across segments',
+  'No narrator speaking to camera (unless explicitly requested)',
+  'No literal recreation of dialogue',
+  'No exaggerated acting or theatrical gestures',
+] as const;
 
 // Configuration constants
 export const BROLL_CONFIG = {
@@ -129,11 +193,61 @@ export const BROLL_CONFIG = {
 export interface BrollGeneratorOutput {
   total_segments: number;
   estimated_duration_seconds: number;
-  segments: {
-    segment_number: number;
-    script_excerpt: string;
-    duration_seconds: number;
-    start_image_prompt: string;  // SEALCaM formatted
-    video_prompt: string;        // SEALCaM formatted
-  }[];
+  color_palette: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+  segments: BrollSegment[];
+}
+
+export interface BrollSegment {
+  segment_number: number;
+  script_excerpt: string;
+  duration_seconds: number;
+  onscreen_text: string;
+  start_image_prompt: string;  // SEALCaM formatted with newlines
+  video_prompt: string;        // SEALCaM formatted with periods
+}
+
+/**
+ * Validates that a start_image_prompt follows the correct format
+ */
+export function validateStartImagePrompt(prompt: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const requiredKeys = ['Subject:', 'Environment:', 'Action:', 'Lighting:', 'Camera:', 'Metatokens:'];
+  
+  for (const key of requiredKeys) {
+    if (!prompt.includes(key)) {
+      errors.push('Missing required key: ' + key);
+    }
+  }
+  
+  if (!prompt.endsWith('ignore the colors of the reference image')) {
+    errors.push('Must end with: "ignore the colors of the reference image"');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validates that a video_prompt follows the correct format
+ */
+export function validateVideoPrompt(prompt: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const requiredKeys = ['Subject:', 'Environment:', 'Action:', 'Lighting:', 'Camera:', 'Metatokens:'];
+  
+  for (const key of requiredKeys) {
+    if (!prompt.includes(key)) {
+      errors.push('Missing required key: ' + key);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }
