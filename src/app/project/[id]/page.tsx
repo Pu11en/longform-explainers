@@ -208,7 +208,9 @@ export default function ProjectPage() {
                                 </span>
                               </div>
                             </div>
-                            <p className="text-xs text-gray-500 mb-2">{segment.image_prompt}</p>
+                            <p className="text-xs text-gray-500 mb-2 line-clamp-3" title={segment.start_image_prompt || ''}>
+                              {segment.start_image_prompt}
+                            </p>
                             
                             {segment.segment_image_url && (
                               <img 

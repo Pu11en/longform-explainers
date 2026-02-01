@@ -111,7 +111,7 @@ async function processProject(projectId: string) {
 
       if (sceneError) throw sceneError;
 
-      // Create B-roll segments for this scene
+      // Create B-roll segments for this scene (using SEALCaM prompts)
       for (let j = 0; j < scene.broll_prompts.length; j++) {
         const broll = scene.broll_prompts[j];
         
@@ -122,8 +122,8 @@ async function processProject(projectId: string) {
             scene_id: sceneRecord.id,
             segment_number: j + 1,
             segment_name: `Scene ${i + 1} - B-Roll ${j + 1}`,
-            image_prompt: broll.image_prompt,
-            video_prompt: broll.video_prompt,
+            start_image_prompt: broll.start_image_prompt,  // SEALCaM formatted
+            video_prompt: broll.video_prompt,              // SEALCaM formatted
             status_image: 'pending',
             status_video: 'pending',
           });
@@ -275,14 +275,14 @@ async function processBroll(projectId: string) {
 
   for (const segment of segments) {
     try {
-      // Generate image first
-      if (segment.image_prompt) {
+      // Generate image first using SEALCaM start_image_prompt
+      if (segment.start_image_prompt) {
         await supabase
           .from('longform_segments')
           .update({ status_image: 'processing' })
           .eq('id', segment.id);
 
-        const imageUrl = await generateImage(segment.image_prompt);
+        const imageUrl = await generateImage(segment.start_image_prompt);
 
         await supabase
           .from('longform_segments')

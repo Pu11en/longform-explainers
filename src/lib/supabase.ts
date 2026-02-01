@@ -54,8 +54,8 @@ export interface Segment {
   scene_id: string;
   segment_number: number;
   segment_name: string | null;
-  image_prompt: string | null;
-  video_prompt: string | null;
+  start_image_prompt: string | null;  // SEALCaM formatted prompt for starting image
+  video_prompt: string | null;         // SEALCaM formatted prompt for motion/video
   status_image: AssetStatus;
   status_video: AssetStatus;
   segment_image_url: string | null;
@@ -64,7 +64,7 @@ export interface Segment {
   updated_at: string;
 }
 
-// Script structure from LLM
+// Script structure from LLM (SEALCaM formatted)
 export interface GeneratedScript {
   scenes: {
     scene_name: string;
@@ -72,8 +72,8 @@ export interface GeneratedScript {
     speech_prompt: string;
     estimate_mins: number;
     broll_prompts: {
-      image_prompt: string;
-      video_prompt: string;
+      start_image_prompt: string;  // SEALCaM: S-E-A-L-Ca-M for initial image
+      video_prompt: string;        // SEALCaM: S-E-A-L-Ca-M for motion
     }[];
   }[];
 }
