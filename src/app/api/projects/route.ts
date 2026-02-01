@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, Project } from '@/lib/supabase';
+import { generateScript } from '@/lib/script-generator';
 
 // GET /api/projects - List all projects
 export async function GET() {
@@ -10,9 +11,7 @@ export async function GET() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     return NextResponse.json({ projects });
   } catch (error) {
@@ -28,7 +27,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase();
-    const { topic } = await request.json();
+    const body = await request.json();
+    const { topic, voiceId, imageUrl } = body;
 
     if (!topic || typeof topic !== 'string') {
       return NextResponse.json(
@@ -37,18 +37,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate project name from topic
+    const projectName = topic.slice(0, 50) + (topic.length > 50 ? '...' : '');
+
     // Create the project
     const { data: project, error: createError } = await supabase
       .from('projects')
-      .insert({ topic, status: 'created' })
+      .insert({
+        project_name: projectName,
+        input_request: topic,
+        input_voice_id: voiceId || null,
+        input_image_url: imageUrl || null,
+        status: 'create',
+      })
       .select()
       .single();
 
-    if (createError) {
-      throw createError;
-    }
+    if (createError) throw createError;
 
-    // Start async processing (don't await)
+    // Start async processing (don't await - runs in background)
     processProject(project.id).catch(console.error);
 
     return NextResponse.json({ project });
@@ -61,16 +68,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Async processing function
+// Main processing pipeline
 async function processProject(projectId: string) {
   const supabase = getSupabase();
   
   try {
     // Update status to scripting
-    await supabase
-      .from('projects')
-      .update({ status: 'scripting', updated_at: new Date().toISOString() })
-      .eq('id', projectId);
+    await updateProjectStatus(projectId, 'scripting');
 
     // Get project details
     const { data: project } = await supabase
@@ -81,157 +85,240 @@ async function processProject(projectId: string) {
 
     if (!project) throw new Error('Project not found');
 
-    // Generate script using OpenRouter/Gemini
-    const scriptResult = await generateScript(project.topic);
-    
-    // Parse segments from script
-    const segments = parseScriptSegments(scriptResult.script);
-    
-    // Save script and create segments
-    await supabase
-      .from('projects')
-      .update({ 
-        script_full: scriptResult.script,
-        broll_prompts: scriptResult.brollPrompts,
-        status: 'voice',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', projectId);
+    // Step 1: Generate script
+    console.log(`[${projectId}] Generating script...`);
+    const scriptData = await generateScript(project.input_request);
 
-    // Create segment records
-    for (let i = 0; i < segments.length; i++) {
-      await supabase
-        .from('segments')
+    // Create scenes from script
+    for (let i = 0; i < scriptData.scenes.length; i++) {
+      const scene = scriptData.scenes[i];
+      
+      const { data: sceneRecord, error: sceneError } = await supabase
+        .from('scenes')
         .insert({
           project_id: projectId,
-          segment_number: i + 1,
-          script_text: segments[i],
-          status: 'pending'
-        });
+          scene_number: i + 1,
+          scene_name: scene.scene_name,
+          script: scene.script,
+          speech_prompt: scene.speech_prompt,
+          estimate_mins: scene.estimate_mins,
+          status_voice: 'pending',
+          status_video: 'pending',
+          status_broll: 'pending',
+        })
+        .select()
+        .single();
+
+      if (sceneError) throw sceneError;
+
+      // Create B-roll segments for this scene
+      for (let j = 0; j < scene.broll_prompts.length; j++) {
+        const broll = scene.broll_prompts[j];
+        
+        await supabase
+          .from('segments')
+          .insert({
+            project_id: projectId,
+            scene_id: sceneRecord.id,
+            segment_number: j + 1,
+            segment_name: `Scene ${i + 1} - B-Roll ${j + 1}`,
+            image_prompt: broll.image_prompt,
+            video_prompt: broll.video_prompt,
+            status_image: 'pending',
+            status_video: 'pending',
+          });
+      }
     }
 
-    // For now, skip voice and video generation (needs API keys)
-    // Mark as done with what we have
-    await supabase
-      .from('projects')
-      .update({ 
-        status: 'done',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', projectId);
+    // Step 2: Generate voice for each scene (if API key available)
+    if (process.env.FISH_AUDIO_API_KEY) {
+      await updateProjectStatus(projectId, 'voice');
+      await processVoice(projectId, project.input_voice_id);
+    }
+
+    // Step 3: Generate video for each scene (if API key + image available)
+    if (process.env.WAVESPEED_API_KEY && project.input_image_url) {
+      await updateProjectStatus(projectId, 'video');
+      await processVideo(projectId, project.input_image_url);
+    }
+
+    // Step 4: Generate B-roll (if API key available)
+    if (process.env.WAVESPEED_API_KEY) {
+      await updateProjectStatus(projectId, 'broll');
+      await processBroll(projectId);
+    }
+
+    // Mark complete
+    await updateProjectStatus(projectId, 'done');
+    console.log(`[${projectId}] Processing complete!`);
 
   } catch (error) {
-    console.error('Error processing project:', error);
+    console.error(`[${projectId}] Processing error:`, error);
     await supabase
       .from('projects')
-      .update({ 
+      .update({
         status: 'error',
         error: error instanceof Error ? error.message : 'Processing failed',
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', projectId);
   }
 }
 
-// Generate script using OpenRouter/Gemini
-async function generateScript(topic: string): Promise<{ script: string; brollPrompts: string[] }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  
-  // If no API key, return a mock script for testing
-  if (!apiKey) {
-    return {
-      script: `# Video Script: ${topic}
-
-## Segment 1: Introduction
-Welcome to this explainer video about ${topic}. Today we'll explore the key concepts and insights that make this topic fascinating.
-
-## Segment 2: Core Concepts
-Let's dive into the fundamental aspects of ${topic}. Understanding these basics will help you grasp the bigger picture.
-
-## Segment 3: Deep Dive
-Now that we've covered the basics, let's explore some more advanced aspects of ${topic} that experts find particularly interesting.
-
-## Segment 4: Real-World Applications
-How does ${topic} apply to our daily lives? Let's look at some practical examples and use cases.
-
-## Segment 5: Conclusion
-To wrap up, we've explored the key aspects of ${topic}. Remember the main points and consider how you might apply this knowledge.`,
-      brollPrompts: [
-        `Abstract visualization of ${topic} concept`,
-        `Professional setting related to ${topic}`,
-        `Infographic style illustration of ${topic}`,
-        `Modern technology representing ${topic}`,
-        `Inspiring conclusion image for ${topic}`
-      ]
-    };
-  }
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://longform-explainers.vercel.app',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.0-flash-001',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert video scriptwriter. Create engaging, segmented video scripts for explainer content. 
-          
-Format your response as:
-1. A full script divided into 4-6 segments (marked with ## Segment N: Title)
-2. After the script, provide 5 B-roll image prompts (one per segment) marked with ## B-Roll Prompts
-
-Each segment should be 30-60 seconds when read aloud (about 75-150 words).`
-        },
-        {
-          role: 'user',
-          content: `Create a professional explainer video script about: ${topic}`
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices[0]?.message?.content || '';
-
-  // Parse B-roll prompts
-  const brollMatch = content.match(/## B-Roll Prompts([\s\S]*?)$/);
-  const brollSection = brollMatch ? brollMatch[1] : '';
-  const brollPrompts = brollSection
-    .split('\n')
-    .filter((line: string) => line.trim().match(/^\d+\.|^-/))
-    .map((line: string) => line.replace(/^\d+\.|^-/, '').trim())
-    .filter(Boolean);
-
-  // Get script without B-roll section
-  const script = content.replace(/## B-Roll Prompts[\s\S]*$/, '').trim();
-
-  return { script, brollPrompts };
+async function updateProjectStatus(projectId: string, status: string) {
+  const supabase = getSupabase();
+  await supabase
+    .from('projects')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', projectId);
 }
 
-// Parse script into segments
-function parseScriptSegments(script: string): string[] {
-  const segmentRegex = /## Segment \d+[:\s].*?\n([\s\S]*?)(?=## Segment \d+|$)/g;
-  const segments: string[] = [];
-  let match;
+// Process voice generation for all scenes
+async function processVoice(projectId: string, voiceId: string | null) {
+  const supabase = getSupabase();
+  const { generateVoice } = await import('@/lib/fish-audio');
 
-  while ((match = segmentRegex.exec(script)) !== null) {
-    segments.push(match[1].trim());
+  const { data: scenes } = await supabase
+    .from('scenes')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('scene_number');
+
+  if (!scenes) return;
+
+  for (const scene of scenes) {
+    try {
+      await supabase
+        .from('scenes')
+        .update({ status_voice: 'processing' })
+        .eq('id', scene.id);
+
+      const result = await generateVoice(scene.script || '', voiceId || undefined);
+
+      await supabase
+        .from('scenes')
+        .update({
+          scene_voice_url: result.url,
+          status_voice: 'done',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', scene.id);
+
+      console.log(`[${projectId}] Voice generated for scene ${scene.scene_number}`);
+    } catch (error) {
+      console.error(`Voice generation error for scene ${scene.id}:`, error);
+      await supabase
+        .from('scenes')
+        .update({ status_voice: 'error' })
+        .eq('id', scene.id);
+    }
   }
+}
 
-  // If no segments found, treat whole script as one segment
-  if (segments.length === 0) {
-    segments.push(script);
+// Process video generation for all scenes
+async function processVideo(projectId: string, imageUrl: string) {
+  const supabase = getSupabase();
+  const { generateTalkingHead } = await import('@/lib/wavespeed');
+
+  const { data: scenes } = await supabase
+    .from('scenes')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('status_voice', 'done')
+    .order('scene_number');
+
+  if (!scenes) return;
+
+  for (const scene of scenes) {
+    if (!scene.scene_voice_url) continue;
+
+    try {
+      await supabase
+        .from('scenes')
+        .update({ status_video: 'processing' })
+        .eq('id', scene.id);
+
+      const videoUrl = await generateTalkingHead(imageUrl, scene.scene_voice_url);
+
+      await supabase
+        .from('scenes')
+        .update({
+          scene_video_url: videoUrl,
+          status_video: 'done',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', scene.id);
+
+      console.log(`[${projectId}] Video generated for scene ${scene.scene_number}`);
+    } catch (error) {
+      console.error(`Video generation error for scene ${scene.id}:`, error);
+      await supabase
+        .from('scenes')
+        .update({ status_video: 'error' })
+        .eq('id', scene.id);
+    }
   }
+}
 
-  return segments;
+// Process B-roll generation
+async function processBroll(projectId: string) {
+  const supabase = getSupabase();
+  const { generateImage, generateBrollVideo } = await import('@/lib/wavespeed');
+
+  const { data: segments } = await supabase
+    .from('segments')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('segment_number');
+
+  if (!segments) return;
+
+  for (const segment of segments) {
+    try {
+      // Generate image first
+      if (segment.image_prompt) {
+        await supabase
+          .from('segments')
+          .update({ status_image: 'processing' })
+          .eq('id', segment.id);
+
+        const imageUrl = await generateImage(segment.image_prompt);
+
+        await supabase
+          .from('segments')
+          .update({
+            segment_image_url: imageUrl,
+            status_image: 'done',
+          })
+          .eq('id', segment.id);
+
+        // Generate video from image
+        if (segment.video_prompt) {
+          await supabase
+            .from('segments')
+            .update({ status_video: 'processing' })
+            .eq('id', segment.id);
+
+          const videoUrl = await generateBrollVideo(imageUrl, segment.video_prompt);
+
+          await supabase
+            .from('segments')
+            .update({
+              segment_video_url: videoUrl,
+              status_video: 'done',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', segment.id);
+        }
+      }
+
+      console.log(`[${projectId}] B-roll generated for segment ${segment.id}`);
+    } catch (error) {
+      console.error(`B-roll generation error for segment ${segment.id}:`, error);
+      await supabase
+        .from('segments')
+        .update({ status_image: 'error', status_video: 'error' })
+        .eq('id', segment.id);
+    }
+  }
 }
