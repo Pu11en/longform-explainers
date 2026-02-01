@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const supabase = getSupabase();
     const { data: projects, error } = await supabase
-      .from('projects')
+      .from('longform_projects')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     // Create the project
     const { data: project, error: createError } = await supabase
-      .from('projects')
+      .from('longform_projects')
       .insert({
         project_name: projectName,
         input_request: topic,
@@ -78,7 +78,7 @@ async function processProject(projectId: string) {
 
     // Get project details
     const { data: project } = await supabase
-      .from('projects')
+      .from('longform_projects')
       .select('*')
       .eq('id', projectId)
       .single();
@@ -94,7 +94,7 @@ async function processProject(projectId: string) {
       const scene = scriptData.scenes[i];
       
       const { data: sceneRecord, error: sceneError } = await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .insert({
           project_id: projectId,
           scene_number: i + 1,
@@ -116,7 +116,7 @@ async function processProject(projectId: string) {
         const broll = scene.broll_prompts[j];
         
         await supabase
-          .from('segments')
+          .from('longform_segments')
           .insert({
             project_id: projectId,
             scene_id: sceneRecord.id,
@@ -155,7 +155,7 @@ async function processProject(projectId: string) {
   } catch (error) {
     console.error(`[${projectId}] Processing error:`, error);
     await supabase
-      .from('projects')
+      .from('longform_projects')
       .update({
         status: 'error',
         error: error instanceof Error ? error.message : 'Processing failed',
@@ -168,7 +168,7 @@ async function processProject(projectId: string) {
 async function updateProjectStatus(projectId: string, status: string) {
   const supabase = getSupabase();
   await supabase
-    .from('projects')
+    .from('longform_projects')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', projectId);
 }
@@ -179,7 +179,7 @@ async function processVoice(projectId: string, voiceId: string | null) {
   const { generateVoice } = await import('@/lib/fish-audio');
 
   const { data: scenes } = await supabase
-    .from('scenes')
+    .from('longform_scenes')
     .select('*')
     .eq('project_id', projectId)
     .order('scene_number');
@@ -189,14 +189,14 @@ async function processVoice(projectId: string, voiceId: string | null) {
   for (const scene of scenes) {
     try {
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({ status_voice: 'processing' })
         .eq('id', scene.id);
 
       const result = await generateVoice(scene.script || '', voiceId || undefined);
 
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({
           scene_voice_url: result.url,
           status_voice: 'done',
@@ -208,7 +208,7 @@ async function processVoice(projectId: string, voiceId: string | null) {
     } catch (error) {
       console.error(`Voice generation error for scene ${scene.id}:`, error);
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({ status_voice: 'error' })
         .eq('id', scene.id);
     }
@@ -221,7 +221,7 @@ async function processVideo(projectId: string, imageUrl: string) {
   const { generateTalkingHead } = await import('@/lib/wavespeed');
 
   const { data: scenes } = await supabase
-    .from('scenes')
+    .from('longform_scenes')
     .select('*')
     .eq('project_id', projectId)
     .eq('status_voice', 'done')
@@ -234,14 +234,14 @@ async function processVideo(projectId: string, imageUrl: string) {
 
     try {
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({ status_video: 'processing' })
         .eq('id', scene.id);
 
       const videoUrl = await generateTalkingHead(imageUrl, scene.scene_voice_url);
 
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({
           scene_video_url: videoUrl,
           status_video: 'done',
@@ -253,7 +253,7 @@ async function processVideo(projectId: string, imageUrl: string) {
     } catch (error) {
       console.error(`Video generation error for scene ${scene.id}:`, error);
       await supabase
-        .from('scenes')
+        .from('longform_scenes')
         .update({ status_video: 'error' })
         .eq('id', scene.id);
     }
@@ -266,7 +266,7 @@ async function processBroll(projectId: string) {
   const { generateImage, generateBrollVideo } = await import('@/lib/wavespeed');
 
   const { data: segments } = await supabase
-    .from('segments')
+    .from('longform_segments')
     .select('*')
     .eq('project_id', projectId)
     .order('segment_number');
@@ -278,14 +278,14 @@ async function processBroll(projectId: string) {
       // Generate image first
       if (segment.image_prompt) {
         await supabase
-          .from('segments')
+          .from('longform_segments')
           .update({ status_image: 'processing' })
           .eq('id', segment.id);
 
         const imageUrl = await generateImage(segment.image_prompt);
 
         await supabase
-          .from('segments')
+          .from('longform_segments')
           .update({
             segment_image_url: imageUrl,
             status_image: 'done',
@@ -295,14 +295,14 @@ async function processBroll(projectId: string) {
         // Generate video from image
         if (segment.video_prompt) {
           await supabase
-            .from('segments')
+            .from('longform_segments')
             .update({ status_video: 'processing' })
             .eq('id', segment.id);
 
           const videoUrl = await generateBrollVideo(imageUrl, segment.video_prompt);
 
           await supabase
-            .from('segments')
+            .from('longform_segments')
             .update({
               segment_video_url: videoUrl,
               status_video: 'done',
@@ -316,7 +316,7 @@ async function processBroll(projectId: string) {
     } catch (error) {
       console.error(`B-roll generation error for segment ${segment.id}:`, error);
       await supabase
-        .from('segments')
+        .from('longform_segments')
         .update({ status_image: 'error', status_video: 'error' })
         .eq('id', segment.id);
     }

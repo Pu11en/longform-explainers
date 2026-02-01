@@ -12,7 +12,7 @@ export async function GET(
 
     // Fetch project
     const { data: project, error: projectError } = await supabase
-      .from('projects')
+      .from('longform_projects')
       .select('*')
       .eq('id', id)
       .single();
@@ -26,7 +26,7 @@ export async function GET(
 
     // Fetch scenes
     const { data: scenes, error: scenesError } = await supabase
-      .from('scenes')
+      .from('longform_scenes')
       .select('*')
       .eq('project_id', id)
       .order('scene_number', { ascending: true });
@@ -35,7 +35,7 @@ export async function GET(
 
     // Fetch segments
     const { data: segments, error: segmentsError } = await supabase
-      .from('segments')
+      .from('longform_segments')
       .select('*')
       .eq('project_id', id)
       .order('segment_number', { ascending: true });
@@ -71,7 +71,7 @@ export async function DELETE(
     const supabase = getSupabase();
 
     const { error } = await supabase
-      .from('projects')
+      .from('longform_projects')
       .delete()
       .eq('id', id);
 
