@@ -39,6 +39,7 @@ export interface Scene {
   script: string | null;
   speech_prompt: string | null;
   estimate_mins: number | null;
+  word_count: number | null;
   status_voice: AssetStatus;
   status_video: AssetStatus;
   status_broll: AssetStatus;
