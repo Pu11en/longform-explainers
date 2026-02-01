@@ -12,8 +12,21 @@ Based on the R52 course lesson workflow.
 - ✍️ AI-powered script generation with scene structure (OpenRouter/Gemini)
 - 🎙️ Text-to-speech voice narration per scene (Fish Audio)
 - 🎬 Talking-head video generation (WaveSpeed InfiniTalk)
-- 🎞️ B-roll image and video generation (Nano Banana + Kling)
+- 🎞️ B-roll generation with **SEALCaM prompting framework** (Nano Banana + Kling)
 - 📊 Real-time progress tracking
+
+## SEALCaM B-Roll Framework
+
+All B-roll prompts use the professional **SEALCaM** structure:
+
+| Component | Description |
+|-----------|-------------|
+| **S – Subject** | What the camera prioritizes (primary subject, foreground/background elements) |
+| **E – Environment** | Physical space surrounding the subject (location, set design, depth) |
+| **A – Action** | Observable motion (subject movement, camera movement, environmental motion) |
+| **L – Lighting** | Lighting setup (key, fill, rim, contrast ratio, color temperature) |
+| **Ca – Camera** | Camera type, lens, focal length, framing, angle, motion |
+| **M – Metatokens** | Visual qualifiers (realism, texture, grain, motion cadence, quality) |
 
 ## Pipeline Flow
 
@@ -21,7 +34,7 @@ Based on the R52 course lesson workflow.
 Topic Input
     ↓
 1. Script Generation (OpenRouter/Gemini)
-   → Creates 5 scenes with scripts, voice prompts, B-roll prompts
+   → Creates 5 scenes with scripts, voice prompts, SEALCaM B-roll prompts
     ↓
 2. Voice Generation (Fish Audio TTS)
    → Creates audio for each scene
@@ -30,7 +43,8 @@ Topic Input
    → Creates talking-head video for each scene
     ↓
 4. B-Roll Generation (Nano Banana + Kling)
-   → Creates images and videos for B-roll
+   → Creates images from start_image_prompt (SEALCaM)
+   → Creates videos from video_prompt (SEALCaM)
     ↓
 Complete Explainer Video Assets
 ```
@@ -53,7 +67,7 @@ Run this SQL in your [Supabase SQL Editor](https://supabase.com/dashboard/projec
 
 ```sql
 -- Projects table
-CREATE TABLE IF NOT EXISTS projects (
+CREATE TABLE IF NOT EXISTS longform_projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_name TEXT NOT NULL,
   input_request TEXT NOT NULL,
@@ -66,9 +80,9 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 -- Scenes table
-CREATE TABLE IF NOT EXISTS scenes (
+CREATE TABLE IF NOT EXISTS longform_scenes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES longform_projects(id) ON DELETE CASCADE,
   scene_number INTEGER NOT NULL,
   scene_name TEXT,
   script TEXT,
@@ -83,15 +97,15 @@ CREATE TABLE IF NOT EXISTS scenes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Segments table (B-Roll)
-CREATE TABLE IF NOT EXISTS segments (
+-- Segments table (B-Roll with SEALCaM prompts)
+CREATE TABLE IF NOT EXISTS longform_segments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-  scene_id UUID REFERENCES scenes(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES longform_projects(id) ON DELETE CASCADE,
+  scene_id UUID REFERENCES longform_scenes(id) ON DELETE CASCADE,
   segment_number INTEGER NOT NULL,
   segment_name TEXT,
-  image_prompt TEXT,
-  video_prompt TEXT,
+  start_image_prompt TEXT,    -- SEALCaM prompt for starting image
+  video_prompt TEXT,          -- SEALCaM prompt for video motion
   status_image TEXT DEFAULT 'pending',
   status_video TEXT DEFAULT 'pending',
   segment_image_url TEXT,
@@ -101,19 +115,18 @@ CREATE TABLE IF NOT EXISTS segments (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_scenes_project_id ON scenes(project_id);
-CREATE INDEX IF NOT EXISTS idx_segments_project_id ON segments(project_id);
-CREATE INDEX IF NOT EXISTS idx_segments_scene_id ON segments(scene_id);
+CREATE INDEX idx_longform_scenes_project ON longform_scenes(project_id);
+CREATE INDEX idx_longform_segments_project ON longform_segments(project_id);
+CREATE INDEX idx_longform_segments_scene ON longform_segments(scene_id);
 
--- Enable RLS
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scenes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE segments ENABLE ROW LEVEL SECURITY;
+-- Enable RLS with open policies
+ALTER TABLE longform_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE longform_scenes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE longform_segments ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations (customize for production)
-CREATE POLICY "Allow all on projects" ON projects FOR ALL USING (true);
-CREATE POLICY "Allow all on scenes" ON scenes FOR ALL USING (true);
-CREATE POLICY "Allow all on segments" ON segments FOR ALL USING (true);
+CREATE POLICY "Allow all on longform_projects" ON longform_projects FOR ALL USING (true);
+CREATE POLICY "Allow all on longform_scenes" ON longform_scenes FOR ALL USING (true);
+CREATE POLICY "Allow all on longform_segments" ON longform_segments FOR ALL USING (true);
 ```
 
 ### 2. Environment Variables
@@ -152,28 +165,6 @@ npm run dev
 ### OpenRouter
 - Endpoint: `POST https://openrouter.ai/api/v1/chat/completions`
 - Model: `google/gemini-2.0-flash-001`
-
-## Data Model
-
-### Projects
-- `project_name` - Display name
-- `input_request` - User's topic/request
-- `input_voice_id` - Fish Audio voice reference
-- `input_image_url` - Talking head avatar image
-- `status` - create → scripting → voice → video → broll → done
-
-### Scenes
-- `scene_name` - e.g., "1 - Hook and Setup"
-- `script` - Generated text for scene
-- `speech_prompt` - Voice direction
-- `scene_voice_url` - Generated audio
-- `scene_video_url` - Generated video
-
-### Segments (B-Roll)
-- `image_prompt` - Prompt for image generation
-- `video_prompt` - Prompt for video from image
-- `segment_image_url` - Generated B-roll image
-- `segment_video_url` - Generated B-roll video
 
 ## License
 
